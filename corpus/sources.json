@@ -1,0 +1,62 @@
+[
+  {
+    "id": "india-code",
+    "title": "India Code",
+    "authority": "Government of India",
+    "source_type": "legislation",
+    "url": "https://www.indiacode.nic.in/",
+    "jurisdiction": "India",
+    "verification": "requires_ingestion",
+    "notes": "Use official text, record retrieval date and checksum, and preserve section hierarchy."
+  },
+  {
+    "id": "egazette",
+    "title": "e-Gazette of India",
+    "authority": "Government of India",
+    "source_type": "notification",
+    "url": "https://egazette.gov.in/",
+    "jurisdiction": "India",
+    "verification": "requires_ingestion",
+    "notes": "Use for commencement dates, amendments and notifications."
+  },
+  {
+    "id": "supreme-court",
+    "title": "Supreme Court of India",
+    "authority": "Supreme Court of India",
+    "source_type": "judgment",
+    "url": "https://www.sci.gov.in/",
+    "jurisdiction": "India",
+    "verification": "requires_ingestion",
+    "notes": "Verify against the official copy before citing a judgment."
+  },
+  {
+    "id": "telangana-high-court",
+    "title": "High Court for the State of Telangana",
+    "authority": "High Court for the State of Telangana",
+    "source_type": "judgment_and_rules",
+    "url": "https://hc.ts.nic.in/",
+    "jurisdiction": "Telangana",
+    "verification": "requires_ingestion",
+    "notes": "Use only after confirming the current official URL and source passage."
+  },
+  {
+    "id": "cybercrime",
+    "title": "National Cyber Crime Reporting Portal",
+    "authority": "Government of India",
+    "source_type": "reporting_guidance",
+    "url": "https://cybercrime.gov.in/",
+    "jurisdiction": "India",
+    "verification": "requires_ingestion",
+    "notes": "Keep helplines and workflow text configuration-driven and verify before launch."
+  },
+  {
+    "id": "nalsa",
+    "title": "National Legal Services Authority",
+    "authority": "NALSA",
+    "source_type": "legal_aid",
+    "url": "https://nalsa.gov.in/",
+    "jurisdiction": "India",
+    "verification": "requires_ingestion",
+    "notes": "Use for legal-aid information and current contact details."
+  }
+]
