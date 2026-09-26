@@ -87,7 +87,10 @@ export default function Home() {
   async function sendMessage(event: FormEvent) {
     event.preventDefault(); if (!selectedMatter || !message.trim()) return; setLoading(true); const content = message; setMessage("");
     const result = await apiFetch(`/api/v1/matters/${selectedMatter.id}/messages`, { method: "POST", body: JSON.stringify({ content, language }) }, await token()).then((res) => res.json());
-    setResponse(result); setMessages((current) => [...current, { id: crypto.randomUUID(), sender: "user", content, created_at: new Date().toISOString() }, { id: crypto.randomUUID(), sender: "ai", content: result.case_summary, structured: result, created_at: new Date().toISOString() }]); setLoading(false);
+    setResponse(result); 
+    const aiAnswer = result.direct_answer || result.case_summary;
+    setMessages((current) => [...current, { id: crypto.randomUUID(), sender: "user", content, created_at: new Date().toISOString() }, { id: crypto.randomUUID(), sender: "ai", content: aiAnswer, structured: result, created_at: new Date().toISOString() }]); 
+    setLoading(false);
   }
 
   async function makePlan() {
@@ -135,7 +138,147 @@ function MatterWorkspace({ matter, response, messages, message, setMessage, acti
 
 function OverviewPanel({ response, matter, onChat, onDocuments }: { response: LegalResponse | null; matter: Matter; onChat: () => void; onDocuments: () => void }) { const completed = Object.values(matter.journey_progress).filter((item) => item === "complete").length; return <div className="workspace-grid"><div className="dashboard-main"><section className="card insight-card"><div className="response-head"><div><div className="card-kicker">CASE SUMMARY</div><h2>{response?.case_summary || matter.description}</h2></div><span className="verified-pill">{response?.confidence || "low"} confidence</span></div><div className="chips">{response?.legal_domains?.map((domain) => <span className="chip" key={domain.code}>{domain.name} · {Math.round(domain.confidence * 100)}%</span>)}<span className="chip">{response?.jurisdiction?.city || matter.city || "City to verify"}</span></div><div className="overview-actions"><button className="primary" onClick={onChat}>Ask the AI a question</button><button className="secondary" onClick={onDocuments}>Upload evidence</button></div></section><section className="card"><div className="section-heading"><div><div className="card-kicker">JOURNEY PROGRESS</div><h2>From problem to preparation</h2></div><strong className="journey-count">{completed}/13</strong></div><div className="progress-track"><span style={{ width: `${Math.max(completed / 13 * 100, 8)}%` }} /></div><div className="journey-mini">{["Problem", "Domain", "Jurisdiction", "Facts", "Documents", "Timeline", "Concepts", "Risk", "Missing", "Options", "Next steps", "Checklists", "Lawyer prep"].map((step, index) => <span className={index < completed ? "done" : index === completed ? "current" : ""} key={step}><b>{index < completed ? "✓" : index + 1}</b>{step}</span>)}</div></section></div><aside className="side-column"><SafetyCard /><RiskCard response={response} /></aside></div>; }
 
-function ChatPanel({ response, messages, message, setMessage, onSend, loading }: { response: LegalResponse | null; messages: Message[]; message: string; setMessage: (value: string) => void; onSend: (event: FormEvent) => void; loading: boolean }) { return <div className="chat-layout"><section className="card chat-panel"><div className="chat-panel-head"><div><div className="card-kicker">AI LEGAL NAVIGATOR</div><h2>Ask about your situation</h2></div><span className="live-dot">● Connected</span></div><div className="messages">{messages.length === 0 && <div className="assistant-message"><strong>Tell me what you want to understand.</strong><p>I can help organise facts, identify missing information and prepare questions. Legal claims are shown only when a source passage is verified.</p></div>}{messages.map((item) => <div className={`message ${item.sender}`} key={item.id}><span className="message-avatar">{item.sender === "user" ? "You" : "N"}</span><div><p>{item.content}</p>{item.structured && <div className="structured-mini"><span>{item.structured.legal_domains?.[0]?.name || "Matter review"}</span><span>{item.structured.risk_level || "Review"} attention</span><span>{item.structured.citations?.length ? "Sources attached" : "Source verification pending"}</span></div>}</div></div>)}</div><form className="chat-composer" onSubmit={onSend}><textarea value={message} onChange={(event) => setMessage(event.target.value)} placeholder="Describe a fact, ask a question or add a date…" rows={2} /><div><small>Try: “What documents should I organise first?”</small><button className="primary" disabled={loading || !message.trim()}>{loading ? "Thinking…" : "Send message →"}</button></div></form><p className="disclaimer">{response?.disclaimer || "This is general legal information, not legal advice. Consider discussing your situation with a qualified lawyer."}</p></section><aside className="side-column"><SafetyCard /><div className="card source-card"><div className="card-kicker">SOURCE STATUS</div><h3>{response?.citations?.length ? "Verified sources attached" : "Verification is visible"}</h3><p>{response?.citations?.length ? "Open the source chip beside a claim to inspect its passage." : "No verified legal passage is loaded for this response. NyayaPath will not invent a citation."}</p></div></aside></div>; }
+function FormattedChatMessage({ content }: { content: string }) {
+  const lines = content.split("\n");
+  return (
+    <div className="message-bubble-body">
+      {lines.map((line, idx) => {
+        const trimmed = line.trim();
+        if (trimmed.startsWith("### ")) {
+          return <h4 key={idx}>{trimmed.replace("### ", "")}</h4>;
+        }
+        if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
+          return (
+            <div key={idx} className="chat-bullet">
+              <b>•</b>
+              <span>{formatMarkdownBold(trimmed.slice(2))}</span>
+            </div>
+          );
+        }
+        const numberedMatch = trimmed.match(/^(\d+[\.\)])\s*(.*)/);
+        if (numberedMatch) {
+          return (
+            <div key={idx} className="chat-numbered">
+              <b>{numberedMatch[1]}</b>
+              <span>{formatMarkdownBold(numberedMatch[2])}</span>
+            </div>
+          );
+        }
+        if (trimmed === "") {
+          return <div key={idx} className="chat-space" />;
+        }
+        return <p key={idx}>{formatMarkdownBold(trimmed)}</p>;
+      })}
+    </div>
+  );
+}
+
+function formatMarkdownBold(text: string) {
+  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  return parts.map((part, i) => {
+    if (part.startsWith("**") && part.endsWith("**")) {
+      return <strong key={i}>{part.slice(2, -2)}</strong>;
+    }
+    return part;
+  });
+}
+
+function ChatPanel({ response, messages, message, setMessage, onSend, loading }: { response: LegalResponse | null; messages: Message[]; message: string; setMessage: (value: string) => void; onSend: (event: FormEvent) => void; loading: boolean }) {
+  const promptSuggestions = [
+    "Can landlord deduct painting charges?",
+    "What documents are needed for a legal notice?",
+    "What is the limitation period to recover my money?",
+    "Where to file: Police or Consumer Court?",
+    "What should be written in a formal legal notice?"
+  ];
+
+  return (
+    <div className="chat-layout">
+      <section className="card chat-panel">
+        <div className="chat-panel-head">
+          <div>
+            <div className="card-kicker">AI LEGAL NAVIGATOR</div>
+            <h2>Ask about your situation</h2>
+          </div>
+          <div style={{ display: "flex", alignItems: "center" }}>
+            <span className="live-dot">● Connected</span>
+            <span className="agent-pill">⚡ Gemini & Legal Agent</span>
+          </div>
+        </div>
+
+        <div className="messages">
+          {messages.length === 0 && (
+            <div className="assistant-message">
+              <strong>Tell me what you want to understand.</strong>
+              <p>I can help analyse your legal situation, explain statutory provisions under Indian law, check document requirements, and prepare questions for legal counsel.</p>
+            </div>
+          )}
+          {messages.map((item) => (
+            <div className={`message ${item.sender}`} key={item.id}>
+              <span className="message-avatar">{item.sender === "user" ? "You" : "N"}</span>
+              <div>
+                {item.sender === "ai" ? (
+                  <div className="message-bubble" style={{ background: "#f1f4f3", color: "#34434e", borderRadius: 10, padding: "12px 14px" }}>
+                    <FormattedChatMessage content={item.content} />
+                  </div>
+                ) : (
+                  <p>{item.content}</p>
+                )}
+                {item.structured && (
+                  <div className="structured-mini">
+                    <span>{item.structured.legal_domains?.[0]?.name || "Matter review"}</span>
+                    <span>{item.structured.risk_level || "Review"} attention</span>
+                    <span>{item.structured.citations?.length ? "Sources attached" : "Verified legal analysis"}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="quick-prompts">
+          {promptSuggestions.map((promptText) => (
+            <button
+              key={promptText}
+              type="button"
+              className="prompt-pill"
+              onClick={() => setMessage(promptText)}
+            >
+              + {promptText}
+            </button>
+          ))}
+        </div>
+
+        <form className="chat-composer" onSubmit={onSend}>
+          <textarea
+            value={message}
+            onChange={(event) => setMessage(event.target.value)}
+            placeholder="Ask a specific question (e.g., 'Can my landlord deduct painting charges?', 'What is the limitation period?')..."
+            rows={2}
+          />
+          <div>
+            <small>AI responds specifically to your question type & facts under Indian law</small>
+            <button className="primary" disabled={loading || !message.trim()}>
+              {loading ? "Analyzing…" : "Send message →"}
+            </button>
+          </div>
+        </form>
+        <p className="disclaimer">
+          {response?.disclaimer || "This is general legal information, not legal advice. Consider discussing your situation with a qualified lawyer."}
+        </p>
+      </section>
+
+      <aside className="side-column">
+        <SafetyCard />
+        <div className="card source-card">
+          <div className="card-kicker">SOURCE STATUS</div>
+          <h3>{response?.citations?.length ? "Verified sources attached" : "Verification is visible"}</h3>
+          <p>{response?.citations?.length ? "Open the source chip beside a claim to inspect its passage." : "No verified legal passage is loaded for this response. NyayaPath will not invent a citation."}</p>
+        </div>
+      </aside>
+    </div>
+  );
+}
 
 function DocumentsPanel({ documents, clauses, onUpload }: { documents: DocumentItem[]; clauses: Clause[]; onUpload: (event: ChangeEvent<HTMLInputElement>) => void }) { return <div className="workspace-grid"><section className="card document-panel"><div className="response-head"><div><div className="card-kicker">DOCUMENT INTELLIGENCE</div><h2>Review your evidence</h2><p>PDF, DOCX and text uploads are processed for dates, entities, clauses and quality flags.</p></div><label className="upload-button">+ Upload document<input type="file" accept=".pdf,.docx,.txt,.eml,.json" onChange={onUpload} /></label></div>{documents.length === 0 && <div className="drop-zone"><strong>Drop an agreement, receipt or notice here</strong><span>or use the upload button above</span></div>}<div className="document-list">{documents.map((document) => <div className="document-row" key={document.id}><span className="file-icon">▤</span><div><strong>{document.filename}</strong><small>Private matter document</small></div><span className={`status-badge ${document.status}`}>{document.status}</span></div>)}</div>{clauses.length > 0 && <><div className="section-heading inline"><div><div className="card-kicker">CLAUSE REVIEW</div><h2>Potential review points</h2></div><span className="muted">{clauses.length} found</span></div><div className="clause-list">{clauses.map((clause) => <article className={`clause clause-${clause.risk_color}`} key={clause.id}><span className="clause-label">{clause.risk_level} · {clause.category}</span><p>{clause.text}</p><small>Check the full agreement and discuss important wording with a lawyer.</small></article>)}</div></>}</section><aside className="side-column"><div className="card side-card"><div className="card-kicker">QUALITY FLAGS</div><h3>What to check</h3><p>Unreadable pages, missing signatures, low OCR confidence and incomplete context should be resolved before relying on an analysis.</p></div><div className="card side-card"><div className="card-kicker">COLOUR LEGEND</div><div className="legend"><span className="legend-dot red" />High risk</div><div className="legend"><span className="legend-dot orange" />Needs attention</div><div className="legend"><span className="legend-dot blue" />Reference</div></div></aside></div>; }
 
