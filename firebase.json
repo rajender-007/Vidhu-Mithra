@@ -1,5 +1,6 @@
 {
   "hosting": {
+    "site": "solution-challange-3897c",
     "public": "apps/web/out",
     "ignore": [
       "firebase.json",
