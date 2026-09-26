@@ -18,6 +18,9 @@ dist/
 build/
 *.egg-info/
 
+# User-uploaded documents
+data/uploads/
+
 # IDE
 .vscode/
 .idea/
