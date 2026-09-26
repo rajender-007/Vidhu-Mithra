@@ -1,8 +1,8 @@
 /**
  * NyayaPath AI Legal Engine & Client API Layer.
  * Supports:
- * 1. AI Agents Integration (Gemini / ChatGPT via rapid API bridge)
- * 2. Intelligent Dynamic Legal Reasoning Engine (analyzes question type, domain, statutes & entities)
+ * 1. Provider-backed AI integration through the server API (Gemini/OpenAI)
+ * 2. Safe browser fallback for demo use when no API is configured
  * 3. In-browser matter store for instant, zero-latency interactions
  */
 
@@ -166,7 +166,7 @@ async function tryCallExternalAIAgent(userPrompt: string, contextPrompt: string)
   const timeoutId = setTimeout(() => controller.abort(), 1800);
 
   try {
-    const prompt = `System: You are NyayaPath AI, an expert Indian legal assistant. Provide a structured, helpful legal answer with Indian legal provisions, clear steps, and document checklist.\nContext: ${contextPrompt}\nUser Question: ${userPrompt}`;
+    const prompt = `System: You are NyayaPath, an Indian legal-information navigator. Explain uncertainty, do not invent statutes or citations, and provide structured preparation guidance rather than legal advice.\nContext: ${contextPrompt}\nUser Question: ${userPrompt}`;
     const url = `https://text.pollinations.ai/${encodeURIComponent(prompt)}?model=openai`;
     const resp = await fetch(url, { signal: controller.signal });
     clearTimeout(timeoutId);
@@ -357,7 +357,8 @@ export async function buildDynamicResponse(description: string, state?: string, 
   const amountStr = entities.amount ? ` involving ${entities.amount}` : "";
   const timeStr = entities.timeframe ? ` pending for ${entities.timeframe}` : "";
 
-  // Attempt external AI agent call with fallback to intelligent local reasoning
+  // The browser fallback is intentionally deterministic. The real provider path
+  // is the server-side Gemini/OpenAI router used when NEXT_PUBLIC_API_BASE_URL is set.
   const aiGeneratedText = await tryCallExternalAIAgent(description, `Matter in ${targetCity}, domain: ${primaryDomain}`);
   const directAnswer = aiGeneratedText || generateQuestionSpecificAnswer(description, null);
 
@@ -421,7 +422,7 @@ export async function mockFetch(path: string, options: RequestInit = {}): Promis
 
   // Health check
   if (path === "/health") {
-    return json({ status: "ok", app: "NyayaPath", environment: "demo", engine: "Gemini / Dynamic Legal AI Agent" });
+    return json({ status: "ok", app: "NyayaPath", environment: "demo", engine: "Safe browser fallback; provider-backed API when configured" });
   }
 
   // List matters

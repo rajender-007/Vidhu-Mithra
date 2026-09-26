@@ -11,10 +11,11 @@
 - Phase 6 thin slice: explainable risk items, action plan and lawyer preparation brief payload, plus read-only share-link stub marked MOCK.
 - Frontend workspace: Supabase email/password login, local demo mode, dashboard/sidebar navigation, matter workspace tabs, live API-backed AI chat, document upload/status/clauses and action-plan views.
 - Alignment and reliability pass: usable evidence timeline and lawyer-preparation brief tabs, server-generated timeline IDs, verification-pending source labels, safer unverified fallback responses, opt-in external browser AI, and expanded API/document tests.
+- GenAI alignment pass: reachable matter intake, follow-up chat, streamed chat, explanation, and action-plan routes now call the configured Gemini/OpenAI `LLMRouter` with structured JSON prompts. Model output is schema-validated, citation-gated, risk-preserving, and falls back to the deterministic safety response on missing credentials, timeout, invalid JSON, or validation failure.
 
 ## Current runtime mode
 
-The demo uses an in-memory matter store so it can run immediately even before the Supabase migrations are applied. API keys are loaded from the project `.env`, but secrets are never returned to the browser. The browser uses only the Supabase public key for auth; the provider router is ready for Gemini or OpenAI; legal responses remain verification-gated and do not accept free-form model citations. Static hosting defaults to the fast local reasoning path; external browser AI is disabled unless `NEXT_PUBLIC_ENABLE_EXTERNAL_AI=true` is explicitly configured.
+The demo uses an in-memory matter store so it can run immediately even before the Supabase migrations are applied. API keys are loaded from the project `.env`, but secrets are never returned to the browser. The browser uses only the Supabase public key for auth; the API provider router invokes Gemini or OpenAI when a server-side key is configured; legal responses remain verification-gated and do not accept free-form model citations. Static hosting defaults to the safe browser fallback when no API base URL is configured; external browser AI is disabled unless `NEXT_PUBLIC_ENABLE_EXTERNAL_AI=true` is explicitly configured.
 
 ## Next implementation sequence
 

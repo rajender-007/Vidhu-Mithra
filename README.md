@@ -134,7 +134,7 @@ flowchart TB
     A --> CORPUS
 ~~~
 
-The web client has a browser-safe fallback in apps/web/lib/mockApi.ts, which makes the static demo usable when the API is not running. The current API flow is deterministic and verification-gated. The provider router is ready for Gemini or OpenAI configuration, but the product should not be described as a production RAG system until corpus ingestion and persistence are connected.
+The web client has a browser-safe fallback in `apps/web/lib/mockApi.ts`, which makes the static demo usable when the API is not running. When the API is configured, matter intake, follow-up chat, streaming chat, explanations, and action plans call the server-side Gemini/OpenAI router with structured JSON output. Responses are schema-validated and remain verification-gated: model output cannot add free-form citations or downgrade a critical risk. The fallback is intentionally labelled as local reasoning and is used only when the API or provider is unavailable. The product should not be described as a production RAG system until corpus ingestion, verified passage retrieval, authenticated persistence, and access controls are connected.
 
 ### Target production direction
 
@@ -162,7 +162,7 @@ flowchart LR
 | Legal reasoning | Python rule-based services | Domain classification, jurisdiction inference, missing-fact questions, risk items, options, and next steps. |
 | Documents | PyMuPDF, python-docx, regex extraction | Native PDF/DOCX/text extraction, dates, amounts, clauses, quality flags, and comments. |
 | Auth and data model | Supabase Auth, PostgreSQL, pgvector, RLS SQL | Auth client and production-oriented schema/security foundation. Runtime persistence is the next integration step. |
-| Model integrations | Configurable Gemini/OpenAI router | Server-side provider abstraction with provider and model names from environment variables. |
+| Model integrations | Configurable Gemini/OpenAI router | Reachable server-side provider path for matter intake, chat, streaming chat, explanations, and action plans; provider/model names come from environment variables. |
 | Deployment | Firebase Hosting, Docker Compose | Static web hosting and local full-stack container workflow. |
 | Quality | Pytest, Ruff, TypeScript build | API unit tests, Python linting, and production web build validation. |
 

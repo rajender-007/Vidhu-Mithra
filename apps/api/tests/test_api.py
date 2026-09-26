@@ -1,9 +1,19 @@
+import json
+
+import pytest
 from fastapi.testclient import TestClient
 
+import app.main as main
 from app.main import app, store
 
 
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def disable_external_llm(monkeypatch):
+    monkeypatch.setattr(main.settings, "gemini_api_key", "")
+    monkeypatch.setattr(main.settings, "openai_api_key", "")
 
 
 def clear_demo_store():
@@ -67,3 +77,25 @@ def test_streaming_message_returns_progress_and_response_events():
     assert "event: progress" in response.text
     assert "event: response" in response.text
     assert "event: done" in response.text
+
+
+def test_configured_provider_response_is_used_on_reachable_routes(monkeypatch):
+    calls = []
+
+    async def fake_complete(system, user, json_mode=False):
+        calls.append({"system": system, "user": user, "json_mode": json_mode})
+        return json.dumps({"case_summary": "Provider-refined summary", "important_facts": ["The user supplied a matter description."]})
+
+    monkeypatch.setattr(main.settings, "gemini_api_key", "test-key")
+    monkeypatch.setattr(main.llm, "complete", fake_complete)
+
+    created = create_matter()
+    assert created["response"]["case_summary"] == "Provider-refined summary"
+
+    matter_id = created["matter"]["id"]
+    message = client.post(f"/api/v1/matters/{matter_id}/messages", json={"content": "What should I preserve?", "language": "en"})
+    assert message.status_code == 200
+    assert message.json()["case_summary"] == "Provider-refined summary"
+    assert len(calls) == 2
+    assert all(call["json_mode"] for call in calls)
+    assert "untrusted data" in calls[0]["system"]
