@@ -240,7 +240,7 @@ async def get_action_plan(matter_id: UUID):
 async def generate_action_plan(matter_id: UUID):
     matter = _matter_or_404(matter_id)
     response = build_response(matter.description, matter.state, matter.city, matter.language)
-    plan = ActionPlan(version=1, current_situation=response.case_summary, known=response.important_facts, unknown=[item.question for item in response.missing_facts], options=response.possible_options, documents_required=response.documents_needed, evidence_to_preserve=["Keep original documents and message exports", "Record dates and amounts with their source"], risks=response.risks, lawyer_questions=["What forum and current provisions should be checked?", "What facts or documents would change the assessment?"], next_best_action="Confirm the missing facts, preserve the originals and prepare a factual chronology before relying on any formal step.")
+    plan = ActionPlan(version=1, current_situation=response.case_summary, known=response.important_facts, unknown=[item.question for item in response.missing_facts], options=response.possible_options, documents_required=response.documents_needed, evidence_to_preserve=["Keep original documents and message exports", "Record dates and amounts with their source"], risks=response.risks, lawyer_questions=["What forum and current provisions should be checked?", "What facts or documents would change the assessment?"], next_best_action="Confirm the missing facts, preserve the originals and ask a qualified professional to verify the current law, forum, deadlines, and any formal step.")
     store.action_plans[matter_id] = plan
     matter.journey_progress["options"] = "complete"
     matter.journey_progress["next_steps"] = "complete"

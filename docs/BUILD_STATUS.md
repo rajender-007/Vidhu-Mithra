@@ -10,10 +10,11 @@
 - Phase 5 thin slice: timeline events derived from extracted dates and editable timeline endpoint.
 - Phase 6 thin slice: explainable risk items, action plan and lawyer preparation brief payload, plus read-only share-link stub marked MOCK.
 - Frontend workspace: Supabase email/password login, local demo mode, dashboard/sidebar navigation, matter workspace tabs, live API-backed AI chat, document upload/status/clauses and action-plan views.
+- Alignment and reliability pass: usable evidence timeline and lawyer-preparation brief tabs, server-generated timeline IDs, verification-pending source labels, safer unverified fallback responses, opt-in external browser AI, and expanded API/document tests.
 
 ## Current runtime mode
 
-The demo uses an in-memory matter store so it can run immediately even before the Supabase migrations are applied. API keys are loaded from the project `.env`, but secrets are never returned to the browser. The browser uses only the Supabase public key for auth; the provider router is ready for Gemini or OpenAI; legal responses remain verification-gated and do not accept free-form model citations.
+The demo uses an in-memory matter store so it can run immediately even before the Supabase migrations are applied. API keys are loaded from the project `.env`, but secrets are never returned to the browser. The browser uses only the Supabase public key for auth; the provider router is ready for Gemini or OpenAI; legal responses remain verification-gated and do not accept free-form model citations. Static hosting defaults to the fast local reasoning path; external browser AI is disabled unless `NEXT_PUBLIC_ENABLE_EXTERNAL_AI=true` is explicitly configured.
 
 ## Next implementation sequence
 

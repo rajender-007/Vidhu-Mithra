@@ -55,6 +55,26 @@ export interface ActionPlan {
   evidence_to_preserve: string[];
 }
 
+export interface TimelineEvent {
+  id: string;
+  event_date: string;
+  title: string;
+  description?: string;
+  source: string;
+  verification_status: "verified" | "partial" | "unverified";
+  confidence: number;
+}
+
+export interface LawyerBrief {
+  title: string;
+  disclaimer: string;
+  issue: string;
+  jurisdiction: { state?: string; city?: string; status: string };
+  timeline: TimelineEvent[];
+  action_plan: ActionPlan | null;
+  questions: string[];
+}
+
 export interface Message {
   id: string;
   sender: "user" | "ai" | "system";
@@ -67,6 +87,9 @@ export interface Message {
 const matters: Map<string, Matter> = new Map();
 const messages: Map<string, Message[]> = new Map();
 const actionPlans: Map<string, ActionPlan> = new Map();
+const timelineEvents: Map<string, TimelineEvent[]> = new Map();
+const answerCache: Map<string, string> = new Map();
+const externalAiEnabled = process.env.NEXT_PUBLIC_ENABLE_EXTERNAL_AI === "true";
 
 function uuid(): string {
   return crypto.randomUUID();
@@ -135,8 +158,12 @@ function extractEntities(text: string) {
 
 // ── Live AI Agent Caller (Gemini / ChatGPT bridge with fast timeout) ──
 async function tryCallExternalAIAgent(userPrompt: string, contextPrompt: string): Promise<string | null> {
+  if (!externalAiEnabled) return null;
+  const cacheKey = `${contextPrompt}::${userPrompt}`.toLowerCase().trim();
+  const cached = answerCache.get(cacheKey);
+  if (cached) return cached;
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 3500); // 3.5s fast timeout
+  const timeoutId = setTimeout(() => controller.abort(), 1800);
 
   try {
     const prompt = `System: You are NyayaPath AI, an expert Indian legal assistant. Provide a structured, helpful legal answer with Indian legal provisions, clear steps, and document checklist.\nContext: ${contextPrompt}\nUser Question: ${userPrompt}`;
@@ -146,7 +173,9 @@ async function tryCallExternalAIAgent(userPrompt: string, contextPrompt: string)
     if (resp.ok) {
       const text = await resp.text();
       if (text && text.trim().length > 40 && !text.includes("Error")) {
-        return text.trim();
+        const answer = text.trim();
+        answerCache.set(cacheKey, answer);
+        return answer;
       }
     }
   } catch {
@@ -233,7 +262,7 @@ To establish your legal claim and prepare for lawyer consultation in ${city}:
 For disputes in **${city}, ${state}**, the primary legal avenues are:
 
 1. **Step 1: Formal Legal Notice (Pre-Litigation)**:
-   - 70-80% of deposit and financial disputes in India are settled after receiving an advocate's legal notice.
+   - A written notice may help create a clear record, but the outcome and appropriate forum depend on the facts and should be checked with a lawyer.
 
 2. **Step 2: Consumer Disputes Redressal Commission (Consumer Court)**:
    - If the counterparty provided a commercial service (e.g. co-living operator, property management company, defective seller, builder), you can file online via the National Consumer Portal (**E-Daakhil** - edaakhil.nic.in).
@@ -241,7 +270,7 @@ For disputes in **${city}, ${state}**, the primary legal avenues are:
 
 3. **Step 3: Rent Court / Rent Tribunal / Civil Court**:
    - Under the local Rent Control Act or Summary Suit under **Order 37 of the Civil Procedure Code (CPC)** for debt recovery based on written agreements.
-   - Very effective because the defendant must obtain leave to defend from the court.
+   - The correct forum, procedure, and eligibility must be confirmed for the specific agreement and jurisdiction.
 
 4. **Step 4: Police Complaint / FIR**:
    - If there is criminal breach of trust (**Section 316 BNS** / Section 405 IPC) or cheating with fraudulent intention from inception (**Section 318 BNS** / Section 420 IPC), a written complaint can be submitted to the local police station or online cybercrime/police portal.`;
@@ -254,15 +283,13 @@ For disputes in **${city}, ${state}**, the primary legal avenues are:
 Under the **Limitation Act, 1963**:
 
 1. **Recovery of Money / Security Deposit / Unpaid Salary**:
-   - **3 Years**: Under Article 19 & 22 of the Limitation Act, the limitation period to file a civil suit for money recovery is **3 years** from the date the money became due (e.g., date of vacating premises or salary due date).
+   - A limitation period may apply, but the correct period depends on the cause of action, document, forum, and later events. Confirm the current provision and exact start date before relying on any deadline.
 
 2. **Consumer Complaint (District Commission)**:
-   - **2 Years**: Under Section 69 of the Consumer Protection Act, 2019, a complaint must be filed within **2 years** from the date on which the cause of action arose.
+   - Consumer matters can have statutory time limits, but the current provision and any condonation rules must be checked against the facts and the current official source.
 
 3. **Cheque Bounce (Section 138 NI Act)**:
-   - Notice within **30 days** of cheque return memo.
-   - 15 days cure period for payment.
-   - Complaint in Magistrate Court within **30 days** after expiry of cure period.
+   - Cheque-related timelines are strict and fact-dependent. Confirm the current notice and filing windows from an official source or qualified lawyer.
 
 *Recommendation: Do not delay. Even though 3 years is allowed, serving a prompt legal notice within the first few weeks greatly increases settlement likelihood.*`;
   }
@@ -334,7 +361,7 @@ export async function buildDynamicResponse(description: string, state?: string, 
   const aiGeneratedText = await tryCallExternalAIAgent(description, `Matter in ${targetCity}, domain: ${primaryDomain}`);
   const directAnswer = aiGeneratedText || generateQuestionSpecificAnswer(description, null);
 
-  const dynamicSummary = `This matter involves ${primaryDomain.toLowerCase()}${amountStr} in ${targetCity}${timeStr}. Analysis indicates established rights under applicable Indian legal statutes, with pre-litigation demand and evidence preservation being the immediate priorities.`;
+  const dynamicSummary = `This matter appears to involve ${primaryDomain.toLowerCase()}${amountStr} in ${targetCity}${timeStr}. This is an initial information review; the applicable law, forum, and deadlines still need source and professional verification.`;
 
   return {
     case_summary: dynamicSummary,
@@ -350,10 +377,10 @@ export async function buildDynamicResponse(description: string, state?: string, 
       "Contemporaneous digital records and payment receipts should be preserved immediately",
     ],
     missing_facts: [
-      { question: "What exact date was the payment made and when did the demand become due?", why_asking: "Essential to calculate the 3-year limitation period and applicable interest." },
+      { question: "What exact date was the payment made and when did the demand become due?", why_asking: "Dates help a qualified reviewer check any applicable deadline or limitation rule." },
       { question: "Is there a written and signed agreement or contract between the parties?", why_asking: "Determines whether a Summary Suit under Order 37 CPC or Consumer Court is preferred." },
       { question: "Have you sent any formal written communication or notice demanding resolution?", why_asking: "Required to establish notice of demand before initiating legal proceedings." },
-      { question: "Do you have digital payment receipts, bank transaction IDs, or bank statements?", why_asking: "Constitutes primary admissible evidence under Section 63 of Bharatiya Sakshya Adhiniyam, 2023." },
+      { question: "Do you have digital payment receipts, bank transaction IDs, or bank statements?", why_asking: "Original records help establish what happened and allow a professional to assess admissibility." },
     ],
     documents_needed: [
       "Signed Lease / Employment / Service Agreement with all schedules",
@@ -364,32 +391,27 @@ export async function buildDynamicResponse(description: string, state?: string, 
       "Identity and address proofs of both claimant and counterparty",
     ],
     possible_options: [
-      { title: "Serve a Formal Advocate Legal Notice", description: `Issue a 15-day statutory legal notice via Speed Post AD. In ${targetCity}, over 75% of similar disputes are settled without court litigation upon receiving a formal advocate notice.`, risk: "LOW" },
-      { title: "Pre-Litigation Mediation via DLSA", description: `Approach the District Legal Services Authority (DLSA) in ${targetCity} for free or low-cost institutional mediation between parties.`, risk: "LOW" },
-      { title: "File Complaint in Consumer Commission (E-Daakhil)", description: "If the counterparty is a service provider, corporate entity, or business, file on edaakhil.nic.in without physical advocate mandate.", risk: "MEDIUM" },
-      { title: "Summary Suit (Order 37 CPC) / Rent Court Filing", description: "Initiate formal judicial proceedings for swift recovery based on written instruments with interest and court costs.", risk: "HIGH" },
+      { title: "Prepare a written request or lawyer-reviewed notice", description: `Organise the facts, agreement, amount, and requested remedy. A lawyer can confirm whether a formal notice and the proposed time window are appropriate in ${targetCity}.`, risk: "LOW" },
+      { title: "Check mediation or legal-aid options", description: `Ask the relevant District Legal Services Authority or authorised forum in ${targetCity} whether mediation or legal aid is available for these facts.`, risk: "LOW" },
+      { title: "Check the potential consumer or civil forum", description: "If the counterparty is a business or service provider, verify the correct forum, eligibility, filing route, and current official procedure before submitting anything.", risk: "MEDIUM" },
+      { title: "Discuss formal proceedings with a lawyer", description: "A qualified lawyer should confirm the cause of action, evidence, limitation, jurisdiction, costs, and risks before any court or police filing.", risk: "HIGH" },
     ],
     risks: [
-      { dimension: "Limitation Period", level: "MEDIUM", explanation: "Claims must be initiated within 3 years (civil) or 2 years (consumer) from the date cause of action arose." },
-      { dimension: "Evidence Admissibility", level: "HIGH", explanation: "Electronic records must satisfy Bharatiya Sakshya Adhiniyam certificate requirements; keep original devices and unedited exports." },
-      { dimension: "Cost-Benefit Ratio", level: "LOW", explanation: "Pre-litigation notice and consumer forums are highly economical relative to contested civil trials." },
+      { dimension: "Deadline uncertainty", level: "MEDIUM", explanation: "The relevant date and current limitation rule have not been verified from a source matched to this matter." },
+      { dimension: "Evidence quality", level: "MEDIUM", explanation: "Original files, complete exports, payment records, and document context should be preserved for professional review." },
+      { dimension: "Forum uncertainty", level: "MEDIUM", explanation: "The correct authority or court cannot be determined from the current facts alone." },
     ],
     next_steps: [
-      { order: 1, title: "Consolidate Written Evidence & Chronology", description: "Collect signed agreements, UTR receipts, and message exports into a single chronological folder.", owner: "You" },
-      { order: 2, title: "Issue Formal Final Demand Letter", description: "Send an unambiguous written demand giving 7 days to settle the outstanding dues.", owner: "You" },
-      { order: 3, title: "Draft Advocate Legal Notice", description: "Instruct a local advocate to issue a formal 15-day legal notice with India Post tracking.", owner: "You / Legal Counsel" },
-      { order: 4, title: "Evaluate Forum Filing (Consumer or Civil)", description: "Proceed to E-Daakhil or Rent Tribunal if the 15-day notice cure window expires without compliance.", owner: "You" },
+      { order: 1, title: "Build a factual chronology", description: "Collect agreements, receipts, messages, and notices with their original dates and sources.", owner: "You" },
+      { order: 2, title: "Ask for missing records", description: "Request an itemized explanation and preserve the response without editing the original evidence.", owner: "You" },
+      { order: 3, title: "Review the matter with a qualified professional", description: "Ask a lawyer to verify the current law, forum, deadline, costs, and any notice wording before relying on it.", owner: "You / Legal Counsel" },
+      { order: 4, title: "Choose a verified next step", description: "Only after verification, decide whether to use negotiation, mediation, a complaint, or another formal route.", owner: "You / Legal Counsel" },
     ],
-    citations: [
-      { title: "Transfer of Property Act, 1882 — Section 108 (Rights and liabilities of lessor and lessee)", verification: "verified_statute", url: "https://www.indiacode.nic.in/handle/123456789/2338" },
-      { title: "Consumer Protection Act, 2019 — Section 35 (Manner in which complaint shall be made)", verification: "verified_statute", url: "https://www.indiacode.nic.in/handle/123456789/15256" },
-      { title: "Limitation Act, 1963 — Articles 19 & 22 (Money payable for money lent and deposited)", verification: "verified_statute", url: "https://www.indiacode.nic.in/handle/123456789/1566" },
-      { title: "Code of Civil Procedure, 1908 — Order XXXVII (Summary Procedure)", verification: "verified_statute", url: "https://www.indiacode.nic.in/handle/123456789/2191" },
-    ],
-    confidence: "high",
+    citations: [],
+    confidence: "low",
     risk_level: domains[0]?.code === "CRIMINAL" ? "HIGH" : "MEDIUM",
     handoff_recommended: true,
-    disclaimer: "This structured assessment is provided by NyayaPath AI Legal Navigator for informational guidance and preparation. It does not constitute formal legal representation or attorney-client advice.",
+    disclaimer: "This is general legal information, not legal advice. Important claims, deadlines, sources, and forum choices must be verified with an official source or qualified lawyer.",
   };
 }
 
@@ -426,6 +448,7 @@ export async function mockFetch(path: string, options: RequestInit = {}): Promis
       created_at: now, updated_at: now,
     };
     matters.set(id, matter);
+    timelineEvents.set(id, []);
 
     const initialAnswer = response.direct_answer || response.case_summary;
     messages.set(id, [
@@ -440,7 +463,7 @@ export async function mockFetch(path: string, options: RequestInit = {}): Promis
   if (matterMatch && method === "GET") {
     const matter = matters.get(matterMatch[1]);
     if (!matter) return json({ error: "Not found" }, 404);
-    return json({ matter, messages: messages.get(matter.id) || [], events: [], action_plan: actionPlans.get(matter.id) || null });
+    return json({ matter, messages: messages.get(matter.id) || [], events: timelineEvents.get(matter.id) || [], action_plan: actionPlans.get(matter.id) || null });
   }
 
   // Send message / AI Chat
@@ -463,6 +486,25 @@ export async function mockFetch(path: string, options: RequestInit = {}): Promis
     list.push({ id: uuid(), sender: "ai", content: tailoredAnswer, structured: response, created_at: new Date().toISOString() });
     messages.set(matter.id, list);
     return json(response);
+  }
+
+  const timelineMatch = path.match(/^\/api\/v1\/matters\/([^/]+)\/timeline$/);
+  if (timelineMatch) {
+    const matter = matters.get(timelineMatch[1]);
+    if (!matter) return json({ error: "Not found" }, 404);
+    if (method === "GET") return json(timelineEvents.get(matter.id) || []);
+    if (method === "POST") {
+      const body = JSON.parse(options.body as string);
+      const event: TimelineEvent = {
+        id: uuid(), event_date: body.event_date, title: body.title, description: body.description,
+        source: "user", verification_status: "unverified", confidence: 1,
+      };
+      const events = timelineEvents.get(matter.id) || [];
+      events.push(event);
+      timelineEvents.set(matter.id, events);
+      matter.journey_progress.timeline = "complete";
+      return json(event, 201);
+    }
   }
 
   // Generate action plan
@@ -495,6 +537,22 @@ export async function mockFetch(path: string, options: RequestInit = {}): Promis
     matter.journey_progress.lawyer_prep = "in_progress";
     matter.stage = "action_plan_ready";
     return json(plan);
+  }
+
+  const briefMatch = path.match(/^\/api\/v1\/matters\/([^/]+)\/lawyer-brief$/);
+  if (briefMatch && method === "POST") {
+    const matter = matters.get(briefMatch[1]);
+    if (!matter) return json({ error: "Not found" }, 404);
+    const plan = actionPlans.get(matter.id) || null;
+    return json({
+      title: `Lawyer preparation brief - ${matter.title}`,
+      disclaimer: "AI-generated preparation draft. Review with a qualified legal professional before use.",
+      issue: matter.description,
+      jurisdiction: { state: matter.state, city: matter.city, status: matter.state || matter.city ? "inferred" : "to be verified" },
+      timeline: timelineEvents.get(matter.id) || [],
+      action_plan: plan,
+      questions: plan?.lawyer_questions || ["Which current law, forum, deadline, and evidence should be verified for this matter?"],
+    });
   }
 
   // Document upload (mock)

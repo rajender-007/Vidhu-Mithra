@@ -1,6 +1,6 @@
 from datetime import date, datetime
 from typing import Literal
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field, HttpUrl
 
@@ -113,7 +113,7 @@ class ExplainRequest(BaseModel):
 
 
 class TimelineEvent(BaseModel):
-    id: UUID
+    id: UUID = Field(default_factory=uuid4)
     event_date: date
     title: str
     description: str = ""

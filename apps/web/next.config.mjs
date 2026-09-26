@@ -2,7 +2,9 @@ import fs from "node:fs";
 import path from "node:path";
 
 const projectEnvPath = path.resolve(process.cwd(), "../../.env");
-const publicEnv = { NEXT_PUBLIC_API_BASE_URL: "http://localhost:8000" };
+// Empty by default so static hosting enters the fast browser demo path. Set
+// NEXT_PUBLIC_API_BASE_URL in .env when a hosted API should be used.
+const publicEnv = { NEXT_PUBLIC_API_BASE_URL: "" };
 
 if (fs.existsSync(projectEnvPath)) {
   for (const line of fs.readFileSync(projectEnvPath, "utf8").split(/\r?\n/)) {

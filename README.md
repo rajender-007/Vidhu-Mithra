@@ -294,6 +294,7 @@ The root .env.example is the canonical template. The API reads the root .env thr
 | Supabase public client | NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY | Email/password login and browser auth session. |
 | Supabase server | SUPABASE_SERVICE_ROLE_KEY, SUPABASE_DB_URL, SUPABASE_URL | Future authenticated persistence and privileged processing. Keep server-only. |
 | Model providers | GEMINI_API_KEY, OPENAI_API_KEY, provider/model variables | Optional provider calls through the API router. |
+| Static demo AI | NEXT_PUBLIC_ENABLE_EXTERNAL_AI | Keep false by default; enables an external browser fallback only when explicitly configured. |
 | Indic language/voice | SARVAM_API_KEY, ENABLE_VOICE_INPUT | Future speech and language workflows. |
 | App and networking | APP_ENV, APP_DEBUG, ports, CORS_ORIGINS | Runtime and local networking. |
 | Limits and privacy | MAX_UPLOAD_SIZE_MB, ENABLE_PII_REDACTION, ENABLE_TELEMETRY | Upload and operational policy. |
@@ -518,4 +519,3 @@ NyayaPath is distributed under the [GNU General Public License v3.0](LICENSE).
 ## Disclaimer
 
 NyayaPath is an educational and organisational software project for legal information. It does not provide legal advice, create an advocate-client relationship, file complaints or cases, guarantee outcomes, or determine the correct forum for a matter. Always verify current law, jurisdiction, deadlines, emergency contacts, and important documents with an appropriately qualified professional.
-
